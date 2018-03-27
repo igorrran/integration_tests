@@ -117,6 +117,9 @@ class PhysicalServer(BaseEntity, Updateable, Pretty, PolicyProfileAssignable, Ta
             delay=5
         )
 
+    def network_adapters(self):
+        return navigate_to(self, 'AllNetworkAdapter')
+
     @variable(alias='ui')
     def power_state(self):
         view = navigate_to(self, "Details")
@@ -362,3 +365,12 @@ class Timelines(CFMENavigateStep):
 
     def step(self):
         self.prerequisite_view.toolbar.monitoring.item_select("Timelines")
+
+
+@navigator.register(PhysicalServer)
+class AllNetworkAdapter(CFMENavigateStep):
+    VIEW = NetworkAdapterView
+    prerequisite = NavigateToSibling("Details")
+
+    def step(self):
+        self.prerequisite_view.entities.properties.click_at("Network Devices")
