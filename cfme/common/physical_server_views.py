@@ -20,8 +20,8 @@ from widgetastic_manageiq import (
     SummaryTable,
     TimelinesView,
     BaseNonInteractiveEntitiesView,
-    ManageIQTree
-)
+    ManageIQTree,
+    EntitiesConditionalView)
 from widgetastic_patternfly import (
     Dropdown,
     Accordion
@@ -64,6 +64,21 @@ class NonJSPhysicalServerEntity(NonJSBaseEntity):
     quad_entity = PhysicalServerQuadIconEntity
     list_entity = PhysicalServerListEntity
     tile_entity = PhysicalServerTileIconEntity
+
+
+class NetworkAdapterListEntity(BaseListEntity):
+    pass
+
+
+class NonJSNetworkAdapterEntity(NonJSBaseEntity):
+    list_entity = NetworkAdapterListEntity
+
+
+class JSNetworkAdapterEntity(JSBaseEntity):
+    @property
+    def data(self):
+        data_dict = super(JSNetworkAdapterEntity, self).data
+        return data_dict
 
 
 class JSPhysicalServerEntity(JSBaseEntity):
@@ -117,6 +132,13 @@ class PhysicalServerDetailsEntities(View):
     firmware = SummaryTable(title="Firmware")
     network_devices = SummaryTable(title="Network Devices")
     smart = SummaryTable(title="Smart Management")
+
+
+class NetworkAdapterDetailsEntities(View):
+    """Represents Details page of Network Adapter"""
+    properties = SummaryTable(title="Properties")
+    ports = SummaryTable(title="Ports")
+    firmware = SummaryTable(title="Firmware")
 
 
 class PhysicalServerDetailsView(ComputePhysicalInfrastructureServersView):
@@ -199,3 +221,37 @@ class PhysicalServersView(ComputePhysicalInfrastructureServersView):
     def is_displayed(self):
         return (self.in_compute_physical_infrastructure_servers and
                 self.title.text == "Physical Servers")
+
+
+def NetworkAdapterEntity():
+    return VersionPick({
+        Version.lowest(): NonJSNetworkAdapterEntity,
+        '5.8': JSNetworkAdapterEntity,
+    })
+
+
+class NetworkAdapterEntitiesView(BaseEntitiesView):
+    @property
+    def entity_class(self):
+        return NetworkAdapterEntity().pick(self.browser.product_version)
+
+
+class NetworkAdaptersView(ComputePhysicalInfrastructureServersView):
+    """including_entities = View.include(NetworkAdapterEntitiesView, use_parent=True)"""
+    entities = View.nested(BaseNonInteractiveEntitiesView)
+
+    @property
+    def is_displayed(self):
+        title = "{name} (All Network Devices)".format(name=self.context["object"].name)
+        return self.breadcrumb.active_location == title
+
+
+class NetworkAdapterDetailsView(View):
+    """Main NetworkAdapter details page."""
+    breadcrumb = BreadCrumb(locator='.//ol[@class="breadcrumb"]')
+
+    @property
+    def is_displayed(self, guest_device_name):
+        title = "{name} (Summary)".format(name=guest_device_name)
+        """return self.breadcrumb.active_location == title"""
+        return title == 'A'

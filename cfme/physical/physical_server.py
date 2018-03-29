@@ -11,7 +11,9 @@ from cfme.common.physical_server_views import (
     PhysicalServerManagePoliciesView,
     PhysicalServersView,
     PhysicalServerProvisionView,
-    PhysicalServerTimelinesView
+    PhysicalServerTimelinesView,
+    NetworkAdaptersView,
+    NetworkAdapterDetailsView
 )
 from cfme.exceptions import (
     ItemNotFound,
@@ -116,6 +118,27 @@ class PhysicalServer(BaseEntity, Updateable, Pretty, PolicyProfileAssignable, Ta
             num_sec=300,
             delay=5
         )
+
+    def guest_devices_id(self):
+
+        guest_device_table = self.appliance.db.client['guest_devices']
+        physical_server_table = self.appliance.db.client['physical_servers']
+        ems_table = self.appliance.db.client['ext_management_systems']
+        computer_system_table = self.appliance.db.client['computer_systems']
+        hardware_table = self.appliance.db.client['hardwares']
+
+        guest_device_query = (
+                 self.appliance.db.client.session
+                .query(physical_server_table.name, guest_device_table.id, guest_device_table.device_name, ems_table.name)
+                .join(ems_table, (physical_server_table.ems_id == ems_table.id) & (physical_server_table.name == self.name))
+                .join(computer_system_table, (computer_system_table.managed_entity_id == physical_server_table.id) & (computer_system_table.managed_entity_type == 'PhysicalServer'))
+                .join(hardware_table, hardware_table.computer_system_id == computer_system_table.id)
+                .join(guest_device_table, (guest_device_table.hardware_id == hardware_table.id) & (guest_device_table.device_type == 'ethernet')))
+
+        guest_devices_id = []
+        for name, guest_id, guest_name, provider in guest_device_query.all():
+            guest_devices_id.append({'name': name, 'guest_id': guest_id, 'guest_name': guest_name})
+        return guest_devices_id
 
     def network_adapters(self):
         return navigate_to(self, 'AllNetworkAdapter')
@@ -369,8 +392,17 @@ class Timelines(CFMENavigateStep):
 
 @navigator.register(PhysicalServer)
 class AllNetworkAdapter(CFMENavigateStep):
-    VIEW = NetworkAdapterView
+    VIEW = NetworkAdaptersView
     prerequisite = NavigateToSibling("Details")
 
     def step(self):
         self.prerequisite_view.entities.properties.click_at("Network Devices")
+
+
+@navigator.register(PhysicalServer)
+class DetailsNetworkAdapter(CFMENavigateStep):
+    VIEW = NetworkAdapterDetailsView
+    prerequisite = NavigateToSibling("AllNetworkAdapter")
+
+    def step(self):
+        self.prerequisite_view.entities.get_entity(entity_id=self.obj.guest_devices_id()[0]['guest_id'], surf_pages=True).click()
